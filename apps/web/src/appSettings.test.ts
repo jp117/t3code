@@ -5,8 +5,8 @@ import {
   getSlashModelOptions,
   normalizeCustomModelSlugs,
   resolveAppServiceTier,
-  shouldShowFastTierIcon,
   resolveAppModelSelection,
+  shouldShowFastTierIcon,
 } from "./appSettings";
 
 describe("normalizeCustomModelSlugs", () => {

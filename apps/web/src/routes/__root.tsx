@@ -9,9 +9,11 @@ import {
 import { useEffect, useRef } from "react";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 
+import { getAppSettingsSnapshot } from "../appSettings";
 import { APP_DISPLAY_NAME } from "../branding";
 import { Button } from "../components/ui/button";
 import { AnchoredToastProvider, ToastProvider, toastManager } from "../components/ui/toast";
+import { playThreadCompletionSoundForEvent } from "../completionSound";
 import { serverConfigQueryOptions, serverQueryKeys } from "../lib/serverReactQuery";
 import { readNativeApi } from "../nativeApi";
 import { useComposerDraftStore } from "../composerDraftStore";
@@ -192,6 +194,11 @@ function EventRouter() {
         return;
       }
       latestSequence = event.sequence;
+      const appSettings = getAppSettingsSnapshot();
+      playThreadCompletionSoundForEvent(event, {
+        enabled: appSettings.enableCompletionSound,
+        volumePercent: appSettings.completionSoundVolume,
+      });
       if (event.type === "thread.turn-diff-completed" || event.type === "thread.reverted") {
         void queryClient.invalidateQueries({ queryKey: providerQueryKeys.all });
       }
