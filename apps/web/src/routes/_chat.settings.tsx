@@ -43,7 +43,7 @@ const THEME_OPTIONS = [
     label: "Nord",
     description: "Use a Nord-inspired dark theme with higher contrast surfaces.",
   },
-] as const satisfies readonly Array<{
+] as const satisfies ReadonlyArray<{
   value: Theme;
   label: string;
   description: string;
