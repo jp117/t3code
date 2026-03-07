@@ -11,6 +11,7 @@ import {
   shouldShowFastTierIcon,
   useAppSettings,
 } from "../appSettings";
+import { clampCompletionSoundVolumePercent } from "../completionSound";
 import { isElectron } from "../env";
 import { type Theme, useTheme } from "../hooks/useTheme";
 import { serverConfigQueryOptions } from "../lib/serverReactQuery";
@@ -529,6 +530,83 @@ function SettingsRouteView() {
                   </Button>
                 </div>
               ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">Notifications</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Play a short sound when a thread turn completes successfully.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Completion sound</p>
+                    <p className="text-xs text-muted-foreground">
+                      Uses your current system output level. This slider scales from 0% to 100% of
+                      that current volume.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.enableCompletionSound}
+                    onCheckedChange={(checked) =>
+                      updateSettings({
+                        enableCompletionSound: Boolean(checked),
+                      })
+                    }
+                    aria-label="Play a sound when a thread turn completes"
+                  />
+                </div>
+
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-foreground">Completion sound volume</span>
+                    <span className="text-xs text-muted-foreground">
+                      {settings.completionSoundVolume}%
+                    </span>
+                  </div>
+                  <input
+                    className="w-full accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={settings.completionSoundVolume}
+                    disabled={!settings.enableCompletionSound}
+                    onChange={(event) =>
+                      updateSettings({
+                        completionSoundVolume: clampCompletionSoundVolumePercent(
+                          event.currentTarget.valueAsNumber,
+                        ),
+                      })
+                    }
+                    aria-label="Completion sound volume"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Relative level before system volume is applied.
+                  </span>
+                </label>
+              </div>
+
+              {(settings.enableCompletionSound !== defaults.enableCompletionSound ||
+                settings.completionSoundVolume !== defaults.completionSoundVolume) && (
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() =>
+                      updateSettings({
+                        enableCompletionSound: defaults.enableCompletionSound,
+                        completionSoundVolume: defaults.completionSoundVolume,
+                      })
+                    }
+                  >
+                    Restore default
+                  </Button>
+                </div>
+              )}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5">

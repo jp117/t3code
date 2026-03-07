@@ -2,6 +2,10 @@ import { useCallback, useSyncExternalStore } from "react";
 import { Option, Schema } from "effect";
 import { type ProviderKind, type ProviderServiceTier } from "@t3tools/contracts";
 import { getDefaultModel, getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
+import {
+  DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT,
+  clampCompletionSoundVolumePercent,
+} from "./completionSound";
 
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
@@ -41,6 +45,12 @@ const AppSettingsSchema = Schema.Struct({
   enableAssistantStreaming: Schema.Boolean.pipe(
     Schema.withConstructorDefault(() => Option.some(false)),
   ),
+  enableCompletionSound: Schema.Boolean.pipe(
+    Schema.withConstructorDefault(() => Option.some(false)),
+  ),
+  completionSoundVolume: Schema.Int.check(
+    Schema.isBetween({ minimum: 0, maximum: 100 }),
+  ).pipe(Schema.withConstructorDefault(() => Option.some(DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT))),
   codexServiceTier: AppServiceTierSchema.pipe(Schema.withConstructorDefault(() => Option.some("auto"))),
   customCodexModels: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(() => Option.some([])),
@@ -107,6 +117,7 @@ export function normalizeCustomModelSlugs(
 function normalizeAppSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
+    completionSoundVolume: clampCompletionSoundVolumePercent(settings.completionSoundVolume),
     customCodexModels: normalizeCustomModelSlugs(settings.customCodexModels, "codex"),
   };
 }
