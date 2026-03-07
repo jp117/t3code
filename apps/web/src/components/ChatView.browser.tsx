@@ -803,6 +803,68 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
+  it("persists Nord theme selection while keeping dark rendering mode", async () => {
+    fixture = buildFixture(
+      createSnapshotForTargetUser({
+        targetMessageId: "msg-user-theme-bootstrap" as MessageId,
+        targetText: "theme bootstrap",
+      }),
+    );
+
+    await setViewport(DEFAULT_VIEWPORT);
+    await waitForProductionStyles();
+
+    const host = document.createElement("div");
+    host.style.position = "fixed";
+    host.style.inset = "0";
+    host.style.width = "100vw";
+    host.style.height = "100vh";
+    host.style.display = "grid";
+    host.style.overflow = "hidden";
+    document.body.append(host);
+
+    const router = getRouter(
+      createMemoryHistory({
+        initialEntries: ["/settings"],
+      }),
+    );
+
+    const screen = await render(<RouterProvider router={router} />, {
+      container: host,
+    });
+
+    try {
+      await waitForLayout();
+
+      const nordButton = await waitForElement(
+        () =>
+          Array.from(document.querySelectorAll("button")).find(
+            (button) => button.textContent?.includes("Nord"),
+          ) as HTMLButtonElement | null,
+        "Unable to find Nord theme option.",
+      );
+
+      nordButton.click();
+
+      await vi.waitFor(
+        () => {
+          expect(localStorage.getItem("t3code:theme")).toBe("nord");
+          expect(document.documentElement.dataset.theme).toBe("nord");
+          expect(document.documentElement.classList.contains("dark")).toBe(true);
+          expect(getComputedStyle(document.documentElement).getPropertyValue("--background").trim()).toBe(
+            "#2e3440",
+          );
+          expect(document.body.textContent).toContain("Selected theme: Nord");
+          expect(document.body.textContent).toContain("Color mode: dark");
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await screen.unmount();
+      host.remove();
+    }
+  });
+
   it("toggles plan mode with Shift+Tab only while the composer is focused", async () => {
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,

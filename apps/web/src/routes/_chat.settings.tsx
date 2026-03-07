@@ -12,7 +12,7 @@ import {
   useAppSettings,
 } from "../appSettings";
 import { isElectron } from "../env";
-import { useTheme } from "../hooks/useTheme";
+import { type Theme, useTheme } from "../hooks/useTheme";
 import { serverConfigQueryOptions } from "../lib/serverReactQuery";
 import { ensureNativeApi } from "../nativeApi";
 import { preferredTerminalEditor } from "../terminal-links";
@@ -38,7 +38,16 @@ const THEME_OPTIONS = [
     label: "Dark",
     description: "Always use the dark theme.",
   },
-] as const;
+  {
+    value: "nord",
+    label: "Nord",
+    description: "Use a Nord-inspired dark theme with higher contrast surfaces.",
+  },
+] as const satisfies readonly Array<{
+  value: Theme;
+  label: string;
+  description: string;
+}>;
 
 const MODEL_PROVIDER_SETTINGS: Array<{
   provider: ProviderKind;
@@ -89,6 +98,7 @@ function patchCustomModels(provider: ProviderKind, models: string[]) {
 function SettingsRouteView() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { settings, defaults, updateSettings } = useAppSettings();
+  const selectedThemeLabel = THEME_OPTIONS.find((option) => option.value === theme)?.label ?? theme;
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const [isOpeningKeybindings, setIsOpeningKeybindings] = useState(false);
   const [openKeybindingsError, setOpenKeybindingsError] = useState<string | null>(null);
@@ -203,7 +213,7 @@ function SettingsRouteView() {
               <div className="mb-4">
                 <h2 className="text-sm font-medium text-foreground">Appearance</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Choose how T3 Code handles light and dark mode.
+                  Choose a theme preset and how T3 Code should resolve color mode.
                 </p>
               </div>
 
@@ -238,7 +248,9 @@ function SettingsRouteView() {
               </div>
 
               <p className="mt-4 text-xs text-muted-foreground">
-                Active theme: <span className="font-medium text-foreground">{resolvedTheme}</span>
+                Selected theme: <span className="font-medium text-foreground">{selectedThemeLabel}</span>
+                {" · "}
+                Color mode: <span className="font-medium text-foreground">{resolvedTheme}</span>
               </p>
             </section>
 

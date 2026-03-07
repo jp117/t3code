@@ -120,6 +120,35 @@
   }
 }
 
+:root[data-theme="nord"] {
+  color-scheme: dark;
+  --background: #2e3440;
+  --foreground: #e5e9f0;
+  --card: #3b4252;
+  --card-foreground: #eceff4;
+  --popover: #3b4252;
+  --popover-foreground: #eceff4;
+  --primary: #88c0d0;
+  --primary-foreground: #2e3440;
+  --secondary: #434c5e;
+  --secondary-foreground: #e5e9f0;
+  --muted: #3b4252;
+  --muted-foreground: #d8dee9;
+  --accent: #4c566a;
+  --accent-foreground: #eceff4;
+  --destructive: #bf616a;
+  --border: color-mix(in srgb, #4c566a 72%, transparent);
+  --input: #434c5e;
+  --ring: #81a1c1;
+  --destructive-foreground: #f3c0c5;
+  --info: #81a1c1;
+  --info-foreground: #d8dee9;
+  --success: #a3be8c;
+  --success-foreground: #e5e9f0;
+  --warning: #ebcb8b;
+  --warning-foreground: #2e3440;
+}
+
 body {
   font-family:
     "DM Sans",
