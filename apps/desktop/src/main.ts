@@ -17,6 +17,7 @@ import { showDesktopConfirmDialog } from "./confirmDialog";
 import { fixPath } from "./fixPath";
 import {
   getAutoUpdateDisabledReason,
+  shouldAllowPrereleaseDesktopUpdates,
   shouldBroadcastDownloadProgress,
 } from "./updateState";
 import {
@@ -59,7 +60,6 @@ const APP_RUN_ID = Crypto.randomBytes(6).toString("hex");
 const AUTO_UPDATE_STARTUP_DELAY_MS = 15_000;
 const AUTO_UPDATE_POLL_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const DESKTOP_UPDATE_CHANNEL = "latest";
-const DESKTOP_UPDATE_ALLOW_PRERELEASE = false;
 
 type DesktopUpdateErrorContext = DesktopUpdateState["errorContext"];
 
@@ -729,7 +729,7 @@ function configureAutoUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = false;
   // Keep alpha branding, but force all installs onto the stable update track.
   autoUpdater.channel = DESKTOP_UPDATE_CHANNEL;
-  autoUpdater.allowPrerelease = DESKTOP_UPDATE_ALLOW_PRERELEASE;
+  autoUpdater.allowPrerelease = shouldAllowPrereleaseDesktopUpdates(app.getVersion());
   autoUpdater.allowDowngrade = false;
   let lastLoggedDownloadMilestone = -1;
 

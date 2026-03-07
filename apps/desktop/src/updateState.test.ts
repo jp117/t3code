@@ -5,6 +5,7 @@ import {
   getCanRetryAfterDownloadFailure,
   getAutoUpdateDisabledReason,
   nextStatusAfterDownloadFailure,
+  shouldAllowPrereleaseDesktopUpdates,
   shouldBroadcastDownloadProgress,
 } from "./updateState";
 
@@ -94,6 +95,18 @@ describe("getAutoUpdateDisabledReason", () => {
         disabledByEnv: false,
       }),
     ).toContain("AppImage");
+  });
+});
+
+describe("shouldAllowPrereleaseDesktopUpdates", () => {
+  it("allows prerelease updates when the installed version is a prerelease", () => {
+    expect(shouldAllowPrereleaseDesktopUpdates("0.0.4-alpha.4")).toBe(true);
+    expect(shouldAllowPrereleaseDesktopUpdates("1.2.3-rc.1+build.7")).toBe(true);
+  });
+
+  it("keeps prerelease updates disabled for stable installed versions", () => {
+    expect(shouldAllowPrereleaseDesktopUpdates("0.0.4")).toBe(false);
+    expect(shouldAllowPrereleaseDesktopUpdates("1.2.3+build.7")).toBe(false);
   });
 });
 
