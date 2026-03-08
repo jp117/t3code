@@ -13,6 +13,8 @@ describe("build-desktop-artifact mac signing config", () => {
     assert.match(source, /entitlements:\s*MAC_ENTITLEMENTS_PATH/);
     assert.match(source, /entitlementsInherit:\s*MAC_INHERIT_ENTITLEMENTS_PATH/);
     assert.match(source, /forceCodeSigning:\s*signed/);
+    assert.match(source, /notarize:\s*false/);
+    assert.match(source, /afterSign:\s*MAC_AFTER_SIGN_HOOK_PATH/);
   });
 
   it("checks in the mac entitlements plists required by the build", async () => {
@@ -28,5 +30,17 @@ describe("build-desktop-artifact mac signing config", () => {
     }
 
     assert.match(inheritEntitlements, /com\.apple\.security\.inherit/);
+  });
+
+  it("checks in the custom mac notarization hook required by the build", async () => {
+    const source = await readFile(
+      resolve(repoRoot, "apps/desktop/resources/electron-builder-notarize.cjs"),
+      "utf8",
+    );
+
+    assert.match(source, /notarytool",\s*"submit/);
+    assert.match(source, /notarytool",\s*"info/);
+    assert.match(source, /stapler",\s*"staple/);
+    assert.match(source, /MAX_POLL_ATTEMPTS = 240/);
   });
 });
