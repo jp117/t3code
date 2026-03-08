@@ -450,7 +450,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   signed: boolean,
 ) {
   const buildConfig: Record<string, unknown> = {
-    appId: "com.t3tools.t3code",
+    appId: "com.johnparadise.t3code",
     productName,
     artifactName: "T3-Code-${version}-${arch}.${ext}",
     directories: {
