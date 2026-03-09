@@ -158,54 +158,8 @@ jobs:
             return 0
           }
 
-          decode_base64_to_file() {
-            local target="$1"
-            if printf '' | base64 --decode >/dev/null 2>&1; then
-              printf '%s' "$CSC_LINK" | tr -d '\n' | base64 --decode > "$target"
-              return
-            fi
-
-            printf '%s' "$CSC_LINK" | tr -d '\n' | base64 -D > "$target"
-          }
-
           if [[ "${{ matrix.platform }}" == "mac" ]]; then
-            if has_all "$CSC_LINK" "$CSC_KEY_PASSWORD" "$APPLE_API_KEY" "$APPLE_API_KEY_ID" "$APPLE_API_ISSUER"; then
-              key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
-              cert_path="$RUNNER_TEMP/t3code-signing-cert.p12"
-              keychain_path="$RUNNER_TEMP/t3code-signing.keychain-db"
-              keychain_password="$(openssl rand -hex 24)"
-
-              printf '%s' "$APPLE_API_KEY" > "$key_path"
-              decode_base64_to_file "$cert_path"
-
-              security create-keychain -p "$keychain_password" "$keychain_path"
-              security set-keychain-settings -lut 21600 "$keychain_path"
-              security unlock-keychain -p "$keychain_password" "$keychain_path"
-              security import "$cert_path" -k "$keychain_path" -P "$CSC_KEY_PASSWORD" \
-                -T /usr/bin/codesign \
-                -T /usr/bin/security \
-                -T /usr/bin/productbuild
-              security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
-                -k "$keychain_password" "$keychain_path"
-
-              existing_keychains=()
-              while IFS= read -r keychain; do
-                existing_keychains+=("$keychain")
-              done < <(security list-keychains -d user | sed 's/^[[:space:]]*"//;s/"$//')
-
-              security list-keychains -d user -s "$keychain_path" "${existing_keychains[@]}"
-              security default-keychain -d user -s "$keychain_path"
-              security find-identity -v -p codesigning "$keychain_path"
-
-              export APPLE_API_KEY="$key_path"
-              export CSC_KEYCHAIN="$keychain_path"
-              export DEBUG="electron-builder,electron-notarize*"
-              unset CSC_LINK
-              echo "macOS signing enabled."
-              args+=(--signed)
-            else
-              echo "macOS signing disabled (missing one or more Apple signing secrets)."
-            fi
+            echo "macOS signing disabled."
           elif [[ "${{ matrix.platform }}" == "win" ]]; then
             if has_all \
               "$AZURE_TENANT_ID" \
