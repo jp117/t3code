@@ -23,6 +23,12 @@ If a tradeoff is required, choose correctness and robustness over short-term con
 
 Long term maintainability is a core priority. If you add new functionality, first check if there are shared logic that can be extracted to a separate module. Duplicate logic across mulitple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
 
+## Release Workflow
+
+- Treat `.github/workflows/release.yml` as fork-specific operational infrastructure.
+- Do not re-merge upstream CI or release-pipeline changes into this repo without explicit review.
+- In particular, do not reintroduce upstream npm publish jobs or upstream signing changes unless explicitly requested.
+
 ## Package Roles
 
 - `apps/server`: Node.js WebSocket server. Wraps Codex app-server (JSON-RPC over stdio), serves the React web app, and manages provider sessions.
