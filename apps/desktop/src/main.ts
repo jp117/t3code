@@ -727,7 +727,7 @@ function configureAutoUpdater(): void {
   }
 
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = true;
   // Keep alpha branding, but force all installs onto the stable update track.
   autoUpdater.channel = DESKTOP_UPDATE_CHANNEL;
   autoUpdater.allowPrerelease = shouldAllowPrereleaseDesktopUpdates(app.getVersion());

@@ -83,6 +83,18 @@ describe("desktop update button state", () => {
     expect(isDesktopUpdateButtonDisabled(state)).toBe(true);
     expect(getDesktopUpdateButtonTooltip(state)).toContain("42%");
   });
+
+  it("explains that downloaded updates also install on app quit", () => {
+    const state: DesktopUpdateState = {
+      ...baseState,
+      status: "downloaded",
+      availableVersion: "1.1.0",
+      downloadedVersion: "1.1.0",
+      canRetry: true,
+    };
+
+    expect(getDesktopUpdateButtonTooltip(state)).toContain("quit the app");
+  });
 });
 
 describe("getDesktopUpdateActionError", () => {

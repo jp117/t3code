@@ -912,7 +912,7 @@ export default function Sidebar() {
             toastManager.add({
               type: "success",
               title: "Update downloaded",
-              description: "Restart the app from the update button to install it.",
+              description: "Click the update button to install now, or quit the app to finish installing.",
             });
           }
           if (!shouldToastDesktopUpdateActionResult(result)) return;
