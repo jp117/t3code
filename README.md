@@ -13,7 +13,7 @@ npx t3
 
 You can also just install the desktop app. It's cooler.
 
-Install the [desktop app from the Releases page](https://github.com/pingdotgg/t3code/releases)
+Install the [desktop app from the Releases page](https://github.com/jp117/t3code/releases)
 
 ## Some notes
 
