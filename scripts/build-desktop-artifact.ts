@@ -178,6 +178,10 @@ interface StagePackageJson {
   };
 }
 
+const MAC_ENTITLEMENTS_PATH = "apps/desktop/resources/entitlements.mac.plist";
+const MAC_INHERIT_ENTITLEMENTS_PATH = "apps/desktop/resources/entitlements.mac.inherit.plist";
+const MAC_AFTER_SIGN_HOOK_PATH = "apps/desktop/resources/electron-builder-notarize.cjs";
+
 const AzureTrustedSigningOptionsConfig = Config.all({
   publisherName: Config.string("AZURE_TRUSTED_SIGNING_PUBLISHER_NAME"),
   endpoint: Config.string("AZURE_TRUSTED_SIGNING_ENDPOINT"),
@@ -453,6 +457,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     directories: {
       buildResources: "apps/desktop/resources",
     },
+    afterSign: MAC_AFTER_SIGN_HOOK_PATH,
   };
   const publishConfig = resolveGitHubPublishConfig();
   if (publishConfig) {
@@ -464,6 +469,12 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
+      hardenedRuntime: true,
+      gatekeeperAssess: false,
+      entitlements: MAC_ENTITLEMENTS_PATH,
+      entitlementsInherit: MAC_INHERIT_ENTITLEMENTS_PATH,
+      forceCodeSigning: signed,
+      notarize: false,
     };
   }
 
