@@ -2,6 +2,12 @@ import { Schema } from "effect";
 import { TrimmedNonEmptyString } from "./baseSchemas";
 
 export const DEFAULT_TERMINAL_ID = "default";
+export const TERMINAL_SHELL_PROFILE_VALUES = [
+  "system",
+  "powershell",
+  "commandPrompt",
+  "wsl",
+] as const;
 
 const TrimmedNonEmptyStringSchema = TrimmedNonEmptyString;
 const TerminalColsSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(20)).check(
@@ -18,9 +24,14 @@ const TerminalEnvValueSchema = Schema.String.check(Schema.isMaxLength(8_192));
 const TerminalEnvSchema = Schema.Record(TerminalEnvKeySchema, TerminalEnvValueSchema).check(
   Schema.isMaxProperties(128),
 );
+export const TerminalShellProfile = Schema.Literals(TERMINAL_SHELL_PROFILE_VALUES);
+export type TerminalShellProfile = typeof TerminalShellProfile.Type;
 
 const TerminalIdWithDefaultSchema = TerminalIdSchema.pipe(
   Schema.withDecodingDefault(() => DEFAULT_TERMINAL_ID),
+);
+const TerminalShellProfileWithDefaultSchema = TerminalShellProfile.pipe(
+  Schema.withDecodingDefault(() => "system"),
 );
 
 export const TerminalThreadInput = Schema.Struct({
@@ -40,6 +51,7 @@ export const TerminalOpenInput = Schema.Struct({
   cols: Schema.optional(TerminalColsSchema),
   rows: Schema.optional(TerminalRowsSchema),
   env: Schema.optional(TerminalEnvSchema),
+  shellProfile: TerminalShellProfileWithDefaultSchema,
 });
 export type TerminalOpenInput = Schema.Codec.Encoded<typeof TerminalOpenInput>;
 
@@ -65,6 +77,7 @@ export const TerminalRestartInput = Schema.Struct({
   cols: TerminalColsSchema,
   rows: TerminalRowsSchema,
   env: Schema.optional(TerminalEnvSchema),
+  shellProfile: TerminalShellProfileWithDefaultSchema,
 });
 
 export const TerminalCloseInput = Schema.Struct({

@@ -8,6 +8,7 @@ import {
   TerminalEvent,
   TerminalOpenInput,
   TerminalResizeInput,
+  TerminalShellProfile,
   TerminalSessionSnapshot,
   TerminalThreadInput,
   TerminalWriteInput,
@@ -59,6 +60,16 @@ describe("TerminalOpenInput", () => {
     expect(parsed.terminalId).toBe(DEFAULT_TERMINAL_ID);
   });
 
+  it("defaults shellProfile when missing", () => {
+    const parsed = decodeSync(TerminalOpenInput, {
+      threadId: "thread-1",
+      cwd: "/tmp/project",
+      cols: 100,
+      rows: 24,
+    });
+    expect(parsed.shellProfile).toBe("system");
+  });
+
   it("accepts optional env overrides", () => {
     const parsed = decodeSync(TerminalOpenInput, {
       threadId: "thread-1",
@@ -76,6 +87,17 @@ describe("TerminalOpenInput", () => {
     });
   });
 
+  it("accepts explicit shell profiles", () => {
+    const parsed = decodeSync(TerminalOpenInput, {
+      threadId: "thread-1",
+      cwd: "/tmp/project",
+      cols: 100,
+      rows: 24,
+      shellProfile: "wsl",
+    });
+    expect(parsed.shellProfile).toBe("wsl");
+  });
+
   it("rejects invalid env keys", () => {
     expect(
       decodes(TerminalOpenInput, {
@@ -88,6 +110,12 @@ describe("TerminalOpenInput", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe("TerminalShellProfile", () => {
+  it("rejects unknown values", () => {
+    expect(decodes(TerminalShellProfile, "fish")).toBe(false);
   });
 });
 

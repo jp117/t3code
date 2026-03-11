@@ -12,6 +12,7 @@ import {
   TerminalEvent,
   TerminalOpenInput,
   TerminalResizeInput,
+  type TerminalShellProfile,
   TerminalSessionSnapshot,
   TerminalSessionStatus,
   TerminalWriteInput,
@@ -41,11 +42,7 @@ export interface TerminalSessionState {
   unsubscribeExit: (() => void) | null;
   hasRunningSubprocess: boolean;
   runtimeEnv: Record<string, string> | null;
-}
-
-export interface ShellCandidate {
-  shell: string;
-  args?: string[];
+  shellProfile: TerminalShellProfile;
 }
 
 export interface TerminalStartInput extends TerminalOpenInput {

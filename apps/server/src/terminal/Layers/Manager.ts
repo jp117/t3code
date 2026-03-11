@@ -19,13 +19,18 @@ import { PtyAdapter, PtyAdapterShape, type PtyExitEvent, type PtyProcess } from 
 import { runProcess } from "../../processRunner";
 import { ServerConfig } from "../../config";
 import {
-  ShellCandidate,
   TerminalError,
   TerminalManager,
   TerminalManagerShape,
   TerminalSessionState,
   TerminalStartInput,
 } from "../Services/Manager";
+import {
+  defaultShellResolver,
+  formatShellLaunchCandidate,
+  resolveTerminalShellLaunchCandidates,
+  type TerminalShellLaunchCandidate,
+} from "../shellLaunch";
 
 const DEFAULT_HISTORY_LINE_LIMIT = 5_000;
 const DEFAULT_PERSIST_DEBOUNCE_MS = 40;
@@ -43,78 +48,6 @@ const decodeTerminalClearInput = Schema.decodeUnknownSync(TerminalClearInput);
 const decodeTerminalCloseInput = Schema.decodeUnknownSync(TerminalCloseInput);
 
 type TerminalSubprocessChecker = (terminalPid: number) => Promise<boolean>;
-
-function defaultShellResolver(): string {
-  if (process.platform === "win32") {
-    return process.env.ComSpec ?? "cmd.exe";
-  }
-  return process.env.SHELL ?? "bash";
-}
-
-function normalizeShellCommand(value: string | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return null;
-
-  if (process.platform === "win32") {
-    return trimmed;
-  }
-
-  const firstToken = trimmed.split(/\s+/g)[0]?.trim();
-  if (!firstToken) return null;
-  return firstToken.replace(/^['"]|['"]$/g, "");
-}
-
-function shellCandidateFromCommand(command: string | null): ShellCandidate | null {
-  if (!command || command.length === 0) return null;
-  const shellName = path.basename(command).toLowerCase();
-  if (process.platform !== "win32" && shellName === "zsh") {
-    return { shell: command, args: ["-o", "nopromptsp"] };
-  }
-  return { shell: command };
-}
-
-function formatShellCandidate(candidate: ShellCandidate): string {
-  if (!candidate.args || candidate.args.length === 0) return candidate.shell;
-  return `${candidate.shell} ${candidate.args.join(" ")}`;
-}
-
-function uniqueShellCandidates(candidates: Array<ShellCandidate | null>): ShellCandidate[] {
-  const seen = new Set<string>();
-  const ordered: ShellCandidate[] = [];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const key = formatShellCandidate(candidate);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    ordered.push(candidate);
-  }
-  return ordered;
-}
-
-function resolveShellCandidates(shellResolver: () => string): ShellCandidate[] {
-  const requested = shellCandidateFromCommand(normalizeShellCommand(shellResolver()));
-
-  if (process.platform === "win32") {
-    return uniqueShellCandidates([
-      requested,
-      shellCandidateFromCommand(process.env.ComSpec ?? null),
-      shellCandidateFromCommand("powershell.exe"),
-      shellCandidateFromCommand("cmd.exe"),
-    ]);
-  }
-
-  return uniqueShellCandidates([
-    requested,
-    shellCandidateFromCommand(normalizeShellCommand(process.env.SHELL)),
-    shellCandidateFromCommand("/bin/zsh"),
-    shellCandidateFromCommand("/bin/bash"),
-    shellCandidateFromCommand("/bin/sh"),
-    shellCandidateFromCommand("zsh"),
-    shellCandidateFromCommand("bash"),
-    shellCandidateFromCommand("sh"),
-  ]);
-}
 
 function isRetryableShellSpawnError(error: unknown): boolean {
   const queue: unknown[] = [error];
@@ -373,6 +306,7 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
           threadId: input.threadId,
           terminalId: input.terminalId,
           cwd: input.cwd,
+          shellProfile: input.shellProfile,
           status: "starting",
           pid: null,
           history,
@@ -399,19 +333,23 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
       const targetRows = input.rows ?? existing.rows;
       const runtimeEnvChanged =
         JSON.stringify(currentRuntimeEnv) !== JSON.stringify(nextRuntimeEnv);
+      const shellProfileChanged = existing.shellProfile !== input.shellProfile;
 
-      if (existing.cwd !== input.cwd || runtimeEnvChanged) {
+      if (existing.cwd !== input.cwd || runtimeEnvChanged || shellProfileChanged) {
         this.stopProcess(existing);
         existing.cwd = input.cwd;
         existing.runtimeEnv = nextRuntimeEnv;
+        existing.shellProfile = input.shellProfile;
         existing.history = "";
         await this.persistHistory(existing.threadId, existing.terminalId, existing.history);
       } else if (existing.status === "exited" || existing.status === "error") {
         existing.runtimeEnv = nextRuntimeEnv;
+        existing.shellProfile = input.shellProfile;
         existing.history = "";
         await this.persistHistory(existing.threadId, existing.terminalId, existing.history);
-      } else if (currentRuntimeEnv !== nextRuntimeEnv) {
+      } else if (currentRuntimeEnv !== nextRuntimeEnv || existing.shellProfile !== input.shellProfile) {
         existing.runtimeEnv = nextRuntimeEnv;
+        existing.shellProfile = input.shellProfile;
       }
 
       if (!existing.process) {
@@ -492,6 +430,7 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
           threadId: input.threadId,
           terminalId: input.terminalId,
           cwd: input.cwd,
+          shellProfile: input.shellProfile,
           status: "starting",
           pid: null,
           history: "",
@@ -512,6 +451,7 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
         this.stopProcess(session);
         session.cwd = input.cwd;
         session.runtimeEnv = normalizedRuntimeEnv(input.env);
+        session.shellProfile = input.shellProfile;
       }
 
       const cols = input.cols ?? session.cols;
@@ -589,16 +529,22 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
     let ptyProcess: PtyProcess | null = null;
     let startedShell: string | null = null;
     try {
-      const shellCandidates = resolveShellCandidates(this.shellResolver);
+      const shellCandidates = resolveTerminalShellLaunchCandidates({
+        platform: process.platform,
+        cwd: session.cwd,
+        shellProfile: session.shellProfile,
+        shellResolver: this.shellResolver,
+        env: process.env,
+      });
       const terminalEnv = createTerminalSpawnEnv(process.env, session.runtimeEnv);
       let lastSpawnError: unknown = null;
 
-      const spawnWithCandidate = (candidate: ShellCandidate) =>
+      const spawnWithCandidate = (candidate: TerminalShellLaunchCandidate) =>
         Effect.runPromise(
           this.ptyAdapter.spawn({
             shell: candidate.shell,
             ...(candidate.args ? { args: candidate.args } : {}),
-            cwd: session.cwd,
+            cwd: candidate.cwd,
             cols: session.cols,
             rows: session.rows,
             env: terminalEnv,
@@ -606,7 +552,7 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
         );
 
       const trySpawn = async (
-        candidates: ShellCandidate[],
+        candidates: TerminalShellLaunchCandidate[],
         index = 0,
       ): Promise<{ process: PtyProcess; shellLabel: string } | null> => {
         if (index >= candidates.length) {
@@ -619,7 +565,7 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
 
         try {
           const process = await spawnWithCandidate(candidate);
-          return { process, shellLabel: formatShellCandidate(candidate) };
+          return { process, shellLabel: formatShellLaunchCandidate(candidate) };
         } catch (error) {
           lastSpawnError = error;
           if (!isRetryableShellSpawnError(error)) {
@@ -640,7 +586,9 @@ export class TerminalManagerRuntime extends EventEmitter<TerminalManagerEvents> 
           lastSpawnError instanceof Error ? lastSpawnError.message : "Terminal start failed";
         const tried =
           shellCandidates.length > 0
-            ? ` Tried shells: ${shellCandidates.map((candidate) => formatShellCandidate(candidate)).join(", ")}.`
+            ? ` Tried shells: ${shellCandidates
+                .map((candidate) => formatShellLaunchCandidate(candidate))
+                .join(", ")}.`
             : "";
         throw new Error(`${detail}.${tried}`.trim());
       }

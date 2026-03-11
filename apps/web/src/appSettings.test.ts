@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getAppModelOptions,
+  getSupportedTerminalShellOptions,
   getSlashModelOptions,
   normalizeCustomModelSlugs,
   resolveAppServiceTier,
@@ -101,5 +102,22 @@ describe("shouldShowFastTierIcon", () => {
     expect(shouldShowFastTierIcon("gpt-5.4", "fast")).toBe(true);
     expect(shouldShowFastTierIcon("gpt-5.4", "auto")).toBe(false);
     expect(shouldShowFastTierIcon("gpt-5.3-codex", "fast")).toBe(false);
+  });
+});
+
+describe("getSupportedTerminalShellOptions", () => {
+  it("includes Windows shell options on Windows platforms", () => {
+    expect(getSupportedTerminalShellOptions("Win32").map((option) => option.value)).toEqual([
+      "system",
+      "powershell",
+      "commandPrompt",
+      "wsl",
+    ]);
+  });
+
+  it("limits non-Windows platforms to the system shell option", () => {
+    expect(getSupportedTerminalShellOptions("Linux").map((option) => option.value)).toEqual([
+      "system",
+    ]);
   });
 });

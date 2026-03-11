@@ -1474,6 +1474,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
             threadId: activeThreadId,
             terminalId: targetTerminalId,
             cwd: targetCwd,
+            shellProfile: settings.terminalShellProfile,
             env: runtimeEnv,
             cols: SCRIPT_TERMINAL_COLS,
             rows: SCRIPT_TERMINAL_ROWS,
@@ -1482,6 +1483,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
             threadId: activeThreadId,
             terminalId: targetTerminalId,
             cwd: targetCwd,
+            shellProfile: settings.terminalShellProfile,
             env: runtimeEnv,
           };
 
@@ -1512,6 +1514,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       terminalState.activeTerminalId,
       terminalState.runningTerminalIds,
       terminalState.terminalIds,
+      settings.terminalShellProfile,
     ],
   );
   const persistProjectScripts = useCallback(
@@ -4005,6 +4008,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
             key={activeThread.id}
             threadId={activeThread.id}
             cwd={gitCwd ?? activeProject.cwd}
+            shellProfile={settings.terminalShellProfile}
             runtimeEnv={threadTerminalRuntimeEnv}
             height={terminalState.terminalHeight}
             terminalIds={terminalState.terminalIds}

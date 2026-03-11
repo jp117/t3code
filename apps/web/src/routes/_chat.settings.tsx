@@ -7,6 +7,7 @@ import { ZapIcon } from "lucide-react";
 
 import {
   APP_SERVICE_TIER_OPTIONS,
+  getSupportedTerminalShellOptions,
   MAX_CUSTOM_MODEL_LENGTH,
   shouldShowFastTierIcon,
   useAppSettings,
@@ -100,6 +101,12 @@ function SettingsRouteView() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { settings, defaults, updateSettings } = useAppSettings();
   const selectedThemeLabel = THEME_OPTIONS.find((option) => option.value === theme)?.label ?? theme;
+  const terminalShellOptions = getSupportedTerminalShellOptions(
+    typeof navigator === "undefined" ? "" : navigator.platform,
+  );
+  const selectedTerminalShellLabel =
+    terminalShellOptions.find((option) => option.value === settings.terminalShellProfile)?.label ??
+    settings.terminalShellProfile;
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const [isOpeningKeybindings, setIsOpeningKeybindings] = useState(false);
   const [openKeybindingsError, setOpenKeybindingsError] = useState<string | null>(null);
@@ -253,6 +260,68 @@ function SettingsRouteView() {
                 {" · "}
                 Color mode: <span className="font-medium text-foreground">{resolvedTheme}</span>
               </p>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">Terminal</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose which shell new built-in terminal sessions should launch.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium text-foreground">Default terminal shell</span>
+                  <Select
+                    items={terminalShellOptions.map((option) => ({
+                      label: option.label,
+                      value: option.value,
+                    }))}
+                    value={settings.terminalShellProfile}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      updateSettings({ terminalShellProfile: value });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectPopup alignItemWithTrigger={false}>
+                      {terminalShellOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">
+                    {terminalShellOptions.find(
+                      (option) => option.value === settings.terminalShellProfile,
+                    )?.description ?? "Use the configured terminal shell for new sessions."}
+                  </span>
+                </label>
+
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <p>
+                    Selected shell:{" "}
+                    <span className="font-medium text-foreground">{selectedTerminalShellLabel}</span>
+                  </p>
+                  {settings.terminalShellProfile !== defaults.terminalShellProfile ? (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() =>
+                        updateSettings({
+                          terminalShellProfile: defaults.terminalShellProfile,
+                        })
+                      }
+                    >
+                      Restore default
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5">

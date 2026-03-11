@@ -1,6 +1,11 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { Option, Schema } from "effect";
-import { type ProviderKind, type ProviderServiceTier } from "@t3tools/contracts";
+import {
+  TERMINAL_SHELL_PROFILE_VALUES,
+  type ProviderKind,
+  type ProviderServiceTier,
+  type TerminalShellProfile,
+} from "@t3tools/contracts";
 import { getDefaultModel, getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 import {
   DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT,
@@ -10,6 +15,32 @@ import {
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
 export const MAX_CUSTOM_MODEL_LENGTH = 256;
+export const APP_TERMINAL_SHELL_OPTIONS = [
+  {
+    value: "system",
+    label: "System default",
+    description: "Use the shell the desktop/server process would normally launch.",
+  },
+  {
+    value: "powershell",
+    label: "PowerShell",
+    description: "Start terminal sessions in Windows PowerShell.",
+  },
+  {
+    value: "commandPrompt",
+    label: "Command Prompt",
+    description: "Start terminal sessions in cmd.exe.",
+  },
+  {
+    value: "wsl",
+    label: "Ubuntu (WSL)",
+    description: "Launch WSL and map the terminal cwd into the matching Linux directory.",
+  },
+] as const satisfies ReadonlyArray<{
+  value: TerminalShellProfile;
+  label: string;
+  description: string;
+}>;
 export const APP_SERVICE_TIER_OPTIONS = [
   {
     value: "auto",
@@ -29,6 +60,7 @@ export const APP_SERVICE_TIER_OPTIONS = [
 ] as const;
 export type AppServiceTier = (typeof APP_SERVICE_TIER_OPTIONS)[number]["value"];
 const AppServiceTierSchema = Schema.Literals(["auto", "fast", "flex"]);
+const AppTerminalShellProfileSchema = Schema.Literals(TERMINAL_SHELL_PROFILE_VALUES);
 const MODELS_WITH_FAST_SUPPORT = new Set(["gpt-5.4"]);
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
   codex: new Set(getModelOptions("codex").map((option) => option.slug)),
@@ -51,6 +83,9 @@ const AppSettingsSchema = Schema.Struct({
   completionSoundVolume: Schema.Int.check(
     Schema.isBetween({ minimum: 0, maximum: 100 }),
   ).pipe(Schema.withConstructorDefault(() => Option.some(DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT))),
+  terminalShellProfile: AppTerminalShellProfileSchema.pipe(
+    Schema.withConstructorDefault(() => Option.some("system")),
+  ),
   codexServiceTier: AppServiceTierSchema.pipe(Schema.withConstructorDefault(() => Option.some("auto"))),
   customCodexModels: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(() => Option.some([])),
@@ -61,6 +96,15 @@ export interface AppModelOption {
   slug: string;
   name: string;
   isCustom: boolean;
+}
+
+export function getSupportedTerminalShellOptions(
+  platform: string,
+): ReadonlyArray<(typeof APP_TERMINAL_SHELL_OPTIONS)[number]> {
+  if (/^win(dows)?/i.test(platform)) {
+    return APP_TERMINAL_SHELL_OPTIONS;
+  }
+  return APP_TERMINAL_SHELL_OPTIONS.filter((option) => option.value === "system");
 }
 
 export function resolveAppServiceTier(serviceTier: AppServiceTier): ProviderServiceTier | null {
