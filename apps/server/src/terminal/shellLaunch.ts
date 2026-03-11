@@ -1,4 +1,5 @@
 import { type TerminalShellProfile } from "@t3tools/contracts";
+import { resolveWslHostCwd, toWslDirectory } from "../wsl";
 
 export interface TerminalShellLaunchCandidate {
   shell: string;
@@ -12,11 +13,6 @@ interface ResolveTerminalShellLaunchOptions {
   shellProfile: TerminalShellProfile;
   shellResolver: () => string;
   env: NodeJS.ProcessEnv;
-}
-
-interface WslDirectory {
-  distro: string | null;
-  linuxPath: string;
 }
 
 export function defaultShellResolver(): string {
@@ -73,54 +69,7 @@ function uniqueShellCandidates(
   return ordered;
 }
 
-function normalizeLinuxPath(pathValue: string): string {
-  const normalized = pathValue.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
-  return normalized.length > 0 ? normalized : "/";
-}
-
-export function toWslDirectory(cwd: string): WslDirectory | null {
-  const trimmed = cwd.trim();
-  if (trimmed.length === 0) return null;
-
-  if (trimmed.startsWith("/")) {
-    return {
-      distro: null,
-      linuxPath: normalizeLinuxPath(trimmed),
-    };
-  }
-
-  const uncMatch = trimmed.match(/^\\\\wsl(?:\$|\.localhost)?\\([^\\]+)(?:\\(.*))?$/i);
-  if (uncMatch) {
-    const distro = uncMatch[1]?.trim() || null;
-    const rest = uncMatch[2] ?? "";
-    return {
-      distro,
-      linuxPath: rest.length > 0 ? normalizeLinuxPath(`/${rest}`) : "/",
-    };
-  }
-
-  const driveMatch = trimmed.match(/^([A-Za-z]):[\\/]*(.*)$/);
-  if (driveMatch) {
-    const drive = driveMatch[1]?.toLowerCase();
-    const rest = driveMatch[2] ?? "";
-    const suffix = rest.length > 0 ? `/${rest}` : "";
-    return {
-      distro: null,
-      linuxPath: normalizeLinuxPath(`/mnt/${drive}${suffix}`),
-    };
-  }
-
-  return null;
-}
-
-function resolveWslSpawnCwd(cwd: string, env: NodeJS.ProcessEnv): string {
-  if (!cwd.startsWith("\\\\")) {
-    return cwd;
-  }
-  return env.USERPROFILE?.trim() || env.SystemRoot?.trim() || "C:\\";
-}
-
-function buildWslArguments(directory: WslDirectory | null): string[] {
+function buildWslArguments(directory: ReturnType<typeof toWslDirectory>): string[] {
   if (!directory) {
     return [];
   }
@@ -153,7 +102,7 @@ function resolveWindowsShellCandidates(
   if (shellProfile === "wsl") {
     const directory = toWslDirectory(cwd);
     const args = buildWslArguments(directory);
-    const spawnCwd = resolveWslSpawnCwd(cwd, env);
+    const spawnCwd = resolveWslHostCwd(cwd, env);
     const systemRoot = env.SystemRoot?.trim();
 
     return uniqueShellCandidates([

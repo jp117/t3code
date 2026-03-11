@@ -1,7 +1,9 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { Option, Schema } from "effect";
 import {
+  CODEX_PROVIDER_RUNTIME_VALUES,
   TERMINAL_SHELL_PROFILE_VALUES,
+  type CodexProviderRuntime,
   type ProviderKind,
   type ProviderServiceTier,
   type TerminalShellProfile,
@@ -15,6 +17,22 @@ import {
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
 export const MAX_CUSTOM_MODEL_LENGTH = 256;
+export const APP_CODEX_RUNTIME_OPTIONS = [
+  {
+    value: "local",
+    label: "Windows local",
+    description: "Launch Codex app-server directly from the Windows-side backend process.",
+  },
+  {
+    value: "wsl",
+    label: "Ubuntu (WSL)",
+    description: "Launch Codex through WSL and translate the session cwd into a Linux path.",
+  },
+] as const satisfies ReadonlyArray<{
+  value: CodexProviderRuntime;
+  label: string;
+  description: string;
+}>;
 export const APP_TERMINAL_SHELL_OPTIONS = [
   {
     value: "system",
@@ -60,6 +78,7 @@ export const APP_SERVICE_TIER_OPTIONS = [
 ] as const;
 export type AppServiceTier = (typeof APP_SERVICE_TIER_OPTIONS)[number]["value"];
 const AppServiceTierSchema = Schema.Literals(["auto", "fast", "flex"]);
+const AppCodexRuntimeSchema = Schema.Literals(CODEX_PROVIDER_RUNTIME_VALUES);
 const AppTerminalShellProfileSchema = Schema.Literals(TERMINAL_SHELL_PROFILE_VALUES);
 const MODELS_WITH_FAST_SUPPORT = new Set(["gpt-5.4"]);
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
@@ -72,6 +91,10 @@ const AppSettingsSchema = Schema.Struct({
   ),
   codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
     Schema.withConstructorDefault(() => Option.some("")),
+  ),
+  codexRuntime: AppCodexRuntimeSchema.pipe(Schema.withConstructorDefault(() => Option.some("local"))),
+  codexWslDistro: Schema.String.check(Schema.isMaxLength(256)).pipe(
+    Schema.withConstructorDefault(() => Option.some("Ubuntu")),
   ),
   confirmThreadDelete: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(true))),
   enableAssistantStreaming: Schema.Boolean.pipe(
@@ -105,6 +128,15 @@ export function getSupportedTerminalShellOptions(
     return APP_TERMINAL_SHELL_OPTIONS;
   }
   return APP_TERMINAL_SHELL_OPTIONS.filter((option) => option.value === "system");
+}
+
+export function getSupportedCodexRuntimeOptions(
+  platform: string,
+): ReadonlyArray<(typeof APP_CODEX_RUNTIME_OPTIONS)[number]> {
+  if (/^win(dows)?/i.test(platform)) {
+    return APP_CODEX_RUNTIME_OPTIONS;
+  }
+  return APP_CODEX_RUNTIME_OPTIONS.filter((option) => option.value === "local");
 }
 
 export function resolveAppServiceTier(serviceTier: AppServiceTier): ProviderServiceTier | null {
@@ -159,8 +191,10 @@ export function normalizeCustomModelSlugs(
 }
 
 function normalizeAppSettings(settings: AppSettings): AppSettings {
+  const trimmedCodexWslDistro = settings.codexWslDistro.trim();
   return {
     ...settings,
+    codexWslDistro: trimmedCodexWslDistro.length > 0 ? trimmedCodexWslDistro : "Ubuntu",
     completionSoundVolume: clampCompletionSoundVolumePercent(settings.completionSoundVolume),
     customCodexModels: normalizeCustomModelSlugs(settings.customCodexModels, "codex"),
   };

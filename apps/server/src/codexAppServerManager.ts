@@ -27,6 +27,7 @@ import {
   isCodexCliVersionSupported,
   parseCodexCliVersion,
 } from "./provider/codexCliVersion";
+import { resolveCodexCliLaunch } from "./codexCliLaunch";
 
 type PendingRequestKey = string;
 
@@ -546,16 +547,25 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
       this.assertSupportedCodexCliVersion({
         binaryPath: codexBinaryPath,
         cwd: resolvedCwd,
+        ...(codexOptions.runtime ? { runtime: codexOptions.runtime } : {}),
+        ...(codexOptions.wslDistro ? { wslDistro: codexOptions.wslDistro } : {}),
         ...(codexHomePath ? { homePath: codexHomePath } : {}),
       });
-      const child = spawn(codexBinaryPath, ["app-server"], {
+      const launch = resolveCodexCliLaunch({
+        platform: process.platform,
         cwd: resolvedCwd,
-        env: {
-          ...process.env,
-          ...(codexHomePath ? { CODEX_HOME: codexHomePath } : {}),
-        },
+        binaryPath: codexBinaryPath,
+        ...(codexHomePath ? { homePath: codexHomePath } : {}),
+        ...(codexOptions.runtime ? { runtime: codexOptions.runtime } : {}),
+        ...(codexOptions.wslDistro ? { wslDistro: codexOptions.wslDistro } : {}),
+        passthroughArgs: ["app-server"],
+        env: process.env,
+      });
+      const child = spawn(launch.command, launch.args, {
+        cwd: launch.cwd,
+        env: launch.env,
         stdio: ["pipe", "pipe", "pipe"],
-        shell: process.platform === "win32",
+        shell: launch.shell,
       });
       const output = readline.createInterface({ input: child.stdout });
 
@@ -1337,6 +1347,8 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     readonly binaryPath: string;
     readonly cwd: string;
     readonly homePath?: string;
+    readonly runtime?: "local" | "wsl";
+    readonly wslDistro?: string;
   }): void {
     assertSupportedCodexCliVersion(input);
   }
@@ -1510,6 +1522,8 @@ function normalizeProviderThreadId(value: string | undefined): string | undefine
 function readCodexProviderOptions(input: CodexAppServerStartSessionInput): {
   readonly binaryPath?: string;
   readonly homePath?: string;
+  readonly runtime?: "local" | "wsl";
+  readonly wslDistro?: string;
 } {
   const options = input.providerOptions?.codex;
   if (!options) {
@@ -1518,6 +1532,8 @@ function readCodexProviderOptions(input: CodexAppServerStartSessionInput): {
   return {
     ...(options.binaryPath ? { binaryPath: options.binaryPath } : {}),
     ...(options.homePath ? { homePath: options.homePath } : {}),
+    ...(options.runtime ? { runtime: options.runtime } : {}),
+    ...(options.wslDistro ? { wslDistro: options.wslDistro } : {}),
   };
 }
 
@@ -1525,15 +1541,24 @@ function assertSupportedCodexCliVersion(input: {
   readonly binaryPath: string;
   readonly cwd: string;
   readonly homePath?: string;
+  readonly runtime?: "local" | "wsl";
+  readonly wslDistro?: string;
 }): void {
-  const result = spawnSync(input.binaryPath, ["--version"], {
+  const launch = resolveCodexCliLaunch({
+    platform: process.platform,
     cwd: input.cwd,
-    env: {
-      ...process.env,
-      ...(input.homePath ? { CODEX_HOME: input.homePath } : {}),
-    },
+    binaryPath: input.binaryPath,
+    ...(input.homePath ? { homePath: input.homePath } : {}),
+    ...(input.runtime ? { runtime: input.runtime } : {}),
+    ...(input.wslDistro ? { wslDistro: input.wslDistro } : {}),
+    passthroughArgs: ["--version"],
+    env: process.env,
+  });
+  const result = spawnSync(launch.command, launch.args, {
+    cwd: launch.cwd,
+    env: launch.env,
     encoding: "utf8",
-    shell: process.platform === "win32",
+    shell: launch.shell,
     stdio: ["ignore", "pipe", "pipe"],
     timeout: CODEX_VERSION_CHECK_TIMEOUT_MS,
     maxBuffer: 1024 * 1024,

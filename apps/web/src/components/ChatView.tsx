@@ -823,16 +823,27 @@ export default function ChatView({ threadId }: ChatViewProps) {
     return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
   }, [selectedCodexFastModeEnabled, selectedEffort, selectedProvider, supportsReasoningEffort]);
   const providerOptionsForDispatch = useMemo(() => {
-    if (!settings.codexBinaryPath && !settings.codexHomePath) {
+    if (
+      settings.codexRuntime === "local" &&
+      !settings.codexBinaryPath &&
+      !settings.codexHomePath
+    ) {
       return undefined;
     }
     return {
       codex: {
+        ...(settings.codexRuntime !== "local" ? { runtime: settings.codexRuntime } : {}),
+        ...(settings.codexRuntime === "wsl" ? { wslDistro: settings.codexWslDistro } : {}),
         ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
         ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
       },
     };
-  }, [settings.codexBinaryPath, settings.codexHomePath]);
+  }, [
+    settings.codexBinaryPath,
+    settings.codexHomePath,
+    settings.codexRuntime,
+    settings.codexWslDistro,
+  ]);
   const selectedModelForPicker = selectedModel;
   const modelOptionsByProvider = useMemo(
     () => getCustomModelOptionsByProvider(settings),

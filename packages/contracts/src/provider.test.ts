@@ -24,6 +24,8 @@ describe("ProviderSessionStartInput", () => {
         codex: {
           binaryPath: "/usr/local/bin/codex",
           homePath: "/tmp/.codex",
+          runtime: "wsl",
+          wslDistro: "Ubuntu",
         },
       },
     });
@@ -32,6 +34,8 @@ describe("ProviderSessionStartInput", () => {
     expect(parsed.modelOptions?.codex?.fastMode).toBe(true);
     expect(parsed.providerOptions?.codex?.binaryPath).toBe("/usr/local/bin/codex");
     expect(parsed.providerOptions?.codex?.homePath).toBe("/tmp/.codex");
+    expect(parsed.providerOptions?.codex?.runtime).toBe("wsl");
+    expect(parsed.providerOptions?.codex?.wslDistro).toBe("Ubuntu");
   });
 
   it("rejects payloads without runtime mode", () => {

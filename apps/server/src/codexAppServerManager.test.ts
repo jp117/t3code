@@ -335,6 +335,8 @@ describe("startSession", () => {
             binaryPath: string;
             cwd: string;
             homePath?: string;
+            runtime?: "local" | "wsl";
+            wslDistro?: string;
           }) => void;
         },
         "assertSupportedCodexCliVersion",

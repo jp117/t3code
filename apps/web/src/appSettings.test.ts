@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getAppModelOptions,
+  getSupportedCodexRuntimeOptions,
   getSupportedTerminalShellOptions,
   getSlashModelOptions,
   normalizeCustomModelSlugs,
@@ -118,6 +119,21 @@ describe("getSupportedTerminalShellOptions", () => {
   it("limits non-Windows platforms to the system shell option", () => {
     expect(getSupportedTerminalShellOptions("Linux").map((option) => option.value)).toEqual([
       "system",
+    ]);
+  });
+});
+
+describe("getSupportedCodexRuntimeOptions", () => {
+  it("includes WSL Codex runtime on Windows platforms", () => {
+    expect(getSupportedCodexRuntimeOptions("Win32").map((option) => option.value)).toEqual([
+      "local",
+      "wsl",
+    ]);
+  });
+
+  it("limits non-Windows platforms to the local runtime", () => {
+    expect(getSupportedCodexRuntimeOptions("Linux").map((option) => option.value)).toEqual([
+      "local",
     ]);
   });
 });

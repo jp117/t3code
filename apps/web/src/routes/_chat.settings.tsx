@@ -7,6 +7,7 @@ import { ZapIcon } from "lucide-react";
 
 import {
   APP_SERVICE_TIER_OPTIONS,
+  getSupportedCodexRuntimeOptions,
   getSupportedTerminalShellOptions,
   MAX_CUSTOM_MODEL_LENGTH,
   shouldShowFastTierIcon,
@@ -104,9 +105,15 @@ function SettingsRouteView() {
   const terminalShellOptions = getSupportedTerminalShellOptions(
     typeof navigator === "undefined" ? "" : navigator.platform,
   );
+  const codexRuntimeOptions = getSupportedCodexRuntimeOptions(
+    typeof navigator === "undefined" ? "" : navigator.platform,
+  );
   const selectedTerminalShellLabel =
     terminalShellOptions.find((option) => option.value === settings.terminalShellProfile)?.label ??
     settings.terminalShellProfile;
+  const selectedCodexRuntimeLabel =
+    codexRuntimeOptions.find((option) => option.value === settings.codexRuntime)?.label ??
+    settings.codexRuntime;
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const [isOpeningKeybindings, setIsOpeningKeybindings] = useState(false);
   const [openKeybindingsError, setOpenKeybindingsError] = useState<string | null>(null);
@@ -121,6 +128,8 @@ function SettingsRouteView() {
 
   const codexBinaryPath = settings.codexBinaryPath;
   const codexHomePath = settings.codexHomePath;
+  const codexRuntime = settings.codexRuntime;
+  const codexWslDistro = settings.codexWslDistro;
   const codexServiceTier = settings.codexServiceTier;
   const keybindingsConfigPath = serverConfigQuery.data?.keybindingsConfigPath ?? null;
 
@@ -333,6 +342,52 @@ function SettingsRouteView() {
               </div>
 
               <div className="space-y-4">
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium text-foreground">Codex runtime</span>
+                  <Select
+                    items={codexRuntimeOptions.map((option) => ({
+                      label: option.label,
+                      value: option.value,
+                    }))}
+                    value={codexRuntime}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      updateSettings({ codexRuntime: value });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectPopup alignItemWithTrigger={false}>
+                      {codexRuntimeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">
+                    {codexRuntimeOptions.find((option) => option.value === codexRuntime)
+                      ?.description ?? "Choose how the backend launches the Codex CLI."}
+                  </span>
+                </label>
+
+                {codexRuntime === "wsl" ? (
+                  <label htmlFor="codex-wsl-distro" className="block space-y-1">
+                    <span className="text-xs font-medium text-foreground">WSL distro</span>
+                    <Input
+                      id="codex-wsl-distro"
+                      value={codexWslDistro}
+                      onChange={(event) => updateSettings({ codexWslDistro: event.target.value })}
+                      placeholder="Ubuntu"
+                      spellCheck={false}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Used with <code>wsl.exe -d</code> when starting Codex app-server.
+                    </span>
+                  </label>
+                ) : null}
+
                 <label htmlFor="codex-binary-path" className="block space-y-1">
                   <span className="text-xs font-medium text-foreground">Codex binary path</span>
                   <Input
@@ -343,7 +398,7 @@ function SettingsRouteView() {
                     spellCheck={false}
                   />
                   <span className="text-xs text-muted-foreground">
-                    Leave blank to use <code>codex</code> from your PATH.
+                    Leave blank to use <code>codex</code> from your {codexRuntime === "wsl" ? "WSL PATH" : "PATH"}.
                   </span>
                 </label>
 
@@ -358,19 +413,28 @@ function SettingsRouteView() {
                   />
                   <span className="text-xs text-muted-foreground">
                     Optional custom Codex home/config directory.
+                    {codexRuntime === "wsl" ? " Use the Linux path inside WSL." : ""}
                   </span>
                 </label>
 
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <p>
-                    Binary source:{" "}
-                    <span className="font-medium text-foreground">{codexBinaryPath || "PATH"}</span>
-                  </p>
+                  <div className="space-y-1">
+                    <p>
+                      Runtime:{" "}
+                      <span className="font-medium text-foreground">{selectedCodexRuntimeLabel}</span>
+                    </p>
+                    <p>
+                      Binary source:{" "}
+                      <span className="font-medium text-foreground">{codexBinaryPath || "PATH"}</span>
+                    </p>
+                  </div>
                   <Button
                     size="xs"
                     variant="outline"
                     onClick={() =>
                       updateSettings({
+                        codexRuntime: defaults.codexRuntime,
+                        codexWslDistro: defaults.codexWslDistro,
                         codexBinaryPath: defaults.codexBinaryPath,
                         codexHomePath: defaults.codexHomePath,
                       })

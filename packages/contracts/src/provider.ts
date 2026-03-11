@@ -25,6 +25,9 @@ import {
 } from "./orchestration";
 
 const TrimmedNonEmptyStringSchema = TrimmedNonEmptyString;
+export const CODEX_PROVIDER_RUNTIME_VALUES = ["local", "wsl"] as const;
+export const CodexProviderRuntime = Schema.Literals(CODEX_PROVIDER_RUNTIME_VALUES);
+export type CodexProviderRuntime = typeof CodexProviderRuntime.Type;
 const ProviderSessionStatus = Schema.Literals([
   "connecting",
   "ready",
@@ -51,6 +54,8 @@ export type ProviderSession = typeof ProviderSession.Type;
 const CodexProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyStringSchema),
   homePath: Schema.optional(TrimmedNonEmptyStringSchema),
+  runtime: Schema.optional(CodexProviderRuntime),
+  wslDistro: Schema.optional(TrimmedNonEmptyStringSchema),
 });
 
 export const ProviderStartOptions = Schema.Struct({

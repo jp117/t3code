@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveTerminalShellLaunchCandidates,
-  toWslDirectory,
 } from "./shellLaunch";
+import { toWslDirectory } from "../wsl";
 
 describe("toWslDirectory", () => {
   it("maps WSL UNC paths to distro-backed Linux paths", () => {

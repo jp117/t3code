@@ -45,9 +45,13 @@ export type ProviderSandboxMode = typeof ProviderSandboxMode.Type;
 export const ProviderServiceTier = Schema.Literals(["fast", "flex"]);
 export type ProviderServiceTier = typeof ProviderServiceTier.Type;
 export const DEFAULT_PROVIDER_KIND: ProviderKind = "codex";
+const CODEX_PROVIDER_RUNTIME_VALUES = ["local", "wsl"] as const;
+const CodexProviderRuntime = Schema.Literals(CODEX_PROVIDER_RUNTIME_VALUES);
 const CodexProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyString),
   homePath: Schema.optional(TrimmedNonEmptyString),
+  runtime: Schema.optional(CodexProviderRuntime),
+  wslDistro: Schema.optional(TrimmedNonEmptyString),
 });
 const ProviderStartOptions = Schema.Struct({
   codex: Schema.optional(CodexProviderStartOptions),
