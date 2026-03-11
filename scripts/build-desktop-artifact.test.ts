@@ -44,3 +44,11 @@ describe("build-desktop-artifact mac signing config", () => {
     assert.match(source, /MAX_POLL_ATTEMPTS = 240/);
   });
 });
+
+describe("build-desktop-artifact Windows installer config", () => {
+  it("disables NSIS desktop shortcut creation", async () => {
+    const source = await readFile(resolve(repoRoot, "scripts/build-desktop-artifact.ts"), "utf8");
+
+    assert.match(source, /buildConfig\.nsis\s*=\s*\{\s*createDesktopShortcut:\s*false,/s);
+  });
+});
