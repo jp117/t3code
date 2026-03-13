@@ -12,6 +12,7 @@ import {
   TerminalEvent,
   TerminalOpenInput,
   TerminalResizeInput,
+  TerminalRestartInput,
   type TerminalShellProfile,
   TerminalSessionSnapshot,
   TerminalSessionStatus,
@@ -43,6 +44,11 @@ export interface TerminalSessionState {
   hasRunningSubprocess: boolean;
   runtimeEnv: Record<string, string> | null;
   shellProfile: TerminalShellProfile;
+}
+
+export interface ShellCandidate {
+  shell: string;
+  args?: string[];
 }
 
 export interface TerminalStartInput extends TerminalOpenInput {
@@ -85,7 +91,7 @@ export interface TerminalManagerShape {
    * Always resets history before spawning the new process.
    */
   readonly restart: (
-    input: TerminalOpenInput,
+    input: TerminalRestartInput,
   ) => Effect.Effect<TerminalSessionSnapshot, TerminalError>;
 
   /**

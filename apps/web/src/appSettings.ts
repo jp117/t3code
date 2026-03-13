@@ -5,7 +5,6 @@ import {
   TERMINAL_SHELL_PROFILE_VALUES,
   type CodexProviderRuntime,
   type ProviderKind,
-  type ProviderServiceTier,
   type TerminalShellProfile,
 } from "@t3tools/contracts";
 import { getDefaultModel, getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
@@ -17,6 +16,9 @@ import {
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
 export const MAX_CUSTOM_MODEL_LENGTH = 256;
+export const TIMESTAMP_FORMAT_OPTIONS = ["locale", "12-hour", "24-hour"] as const;
+export type TimestampFormat = (typeof TIMESTAMP_FORMAT_OPTIONS)[number];
+export const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
 export const APP_CODEX_RUNTIME_OPTIONS = [
   {
     value: "local",
@@ -59,28 +61,8 @@ export const APP_TERMINAL_SHELL_OPTIONS = [
   label: string;
   description: string;
 }>;
-export const APP_SERVICE_TIER_OPTIONS = [
-  {
-    value: "auto",
-    label: "Automatic",
-    description: "Use Codex defaults without forcing a service tier.",
-  },
-  {
-    value: "fast",
-    label: "Fast",
-    description: "Request the fast service tier when the model supports it.",
-  },
-  {
-    value: "flex",
-    label: "Flex",
-    description: "Request the flex service tier when the model supports it.",
-  },
-] as const;
-export type AppServiceTier = (typeof APP_SERVICE_TIER_OPTIONS)[number]["value"];
-const AppServiceTierSchema = Schema.Literals(["auto", "fast", "flex"]);
 const AppCodexRuntimeSchema = Schema.Literals(CODEX_PROVIDER_RUNTIME_VALUES);
 const AppTerminalShellProfileSchema = Schema.Literals(TERMINAL_SHELL_PROFILE_VALUES);
-const MODELS_WITH_FAST_SUPPORT = new Set(["gpt-5.4"]);
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
   codex: new Set(getModelOptions("codex").map((option) => option.slug)),
 };
@@ -92,9 +74,14 @@ const AppSettingsSchema = Schema.Struct({
   codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
     Schema.withConstructorDefault(() => Option.some("")),
   ),
-  codexRuntime: AppCodexRuntimeSchema.pipe(Schema.withConstructorDefault(() => Option.some("local"))),
+  codexRuntime: AppCodexRuntimeSchema.pipe(
+    Schema.withConstructorDefault(() => Option.some("local")),
+  ),
   codexWslDistro: Schema.String.check(Schema.isMaxLength(256)).pipe(
     Schema.withConstructorDefault(() => Option.some("Ubuntu")),
+  ),
+  defaultThreadEnvMode: Schema.Literals(["local", "worktree"]).pipe(
+    Schema.withConstructorDefault(() => Option.some("local")),
   ),
   confirmThreadDelete: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(true))),
   enableAssistantStreaming: Schema.Boolean.pipe(
@@ -103,13 +90,15 @@ const AppSettingsSchema = Schema.Struct({
   enableCompletionSound: Schema.Boolean.pipe(
     Schema.withConstructorDefault(() => Option.some(false)),
   ),
-  completionSoundVolume: Schema.Int.check(
-    Schema.isBetween({ minimum: 0, maximum: 100 }),
-  ).pipe(Schema.withConstructorDefault(() => Option.some(DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT))),
+  completionSoundVolume: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })).pipe(
+    Schema.withConstructorDefault(() => Option.some(DEFAULT_COMPLETION_SOUND_VOLUME_PERCENT)),
+  ),
   terminalShellProfile: AppTerminalShellProfileSchema.pipe(
     Schema.withConstructorDefault(() => Option.some("system")),
   ),
-  codexServiceTier: AppServiceTierSchema.pipe(Schema.withConstructorDefault(() => Option.some("auto"))),
+  timestampFormat: Schema.Literals(["locale", "12-hour", "24-hour"]).pipe(
+    Schema.withConstructorDefault(() => Option.some(DEFAULT_TIMESTAMP_FORMAT)),
+  ),
   customCodexModels: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(() => Option.some([])),
   ),
@@ -137,22 +126,6 @@ export function getSupportedCodexRuntimeOptions(
     return APP_CODEX_RUNTIME_OPTIONS;
   }
   return APP_CODEX_RUNTIME_OPTIONS.filter((option) => option.value === "local");
-}
-
-export function resolveAppServiceTier(serviceTier: AppServiceTier): ProviderServiceTier | null {
-  return serviceTier === "auto" ? null : serviceTier;
-}
-
-export function shouldShowFastTierIcon(
-  model: string | null | undefined,
-  serviceTier: AppServiceTier,
-): boolean {
-  const normalizedModel = normalizeModelSlug(model);
-  return (
-    resolveAppServiceTier(serviceTier) === "fast" &&
-    normalizedModel !== null &&
-    MODELS_WITH_FAST_SUPPORT.has(normalizedModel)
-  );
 }
 
 const DEFAULT_APP_SETTINGS = AppSettingsSchema.makeUnsafe({});

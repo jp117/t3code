@@ -1,3 +1,4 @@
+import type { DesktopTheme } from "@t3tools/contracts";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark" | "system" | "nord";
@@ -11,6 +12,7 @@ const MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
 let listeners: Array<() => void> = [];
 let lastSnapshot: ThemeSnapshot | null = null;
+let lastDesktopTheme: DesktopTheme | null = null;
 function emitChange() {
   for (const listener of listeners) listener();
 }
@@ -32,6 +34,7 @@ function applyTheme(theme: Theme, suppressTransitions = false) {
   const isDark = theme === "dark" || theme === "nord" || (theme === "system" && getSystemDark());
   document.documentElement.classList.toggle("dark", isDark);
   document.documentElement.dataset.theme = theme;
+  syncDesktopTheme(theme === "nord" ? "dark" : theme);
   if (suppressTransitions) {
     // Force a reflow so the no-transitions class takes effect before removal
     // oxlint-disable-next-line no-unused-expressions
@@ -40,6 +43,20 @@ function applyTheme(theme: Theme, suppressTransitions = false) {
       document.documentElement.classList.remove("no-transitions");
     });
   }
+}
+
+function syncDesktopTheme(theme: DesktopTheme) {
+  const bridge = window.desktopBridge;
+  if (!bridge || lastDesktopTheme === theme) {
+    return;
+  }
+
+  lastDesktopTheme = theme;
+  void bridge.setTheme(theme).catch(() => {
+    if (lastDesktopTheme === theme) {
+      lastDesktopTheme = null;
+    }
+  });
 }
 
 // Apply immediately on module load to prevent flash
@@ -89,7 +106,13 @@ export function useTheme() {
   const theme = snapshot.theme;
 
   const resolvedTheme: "light" | "dark" =
-    theme === "system" ? (snapshot.systemDark ? "dark" : "light") : theme === "nord" ? "dark" : theme;
+    theme === "system"
+      ? snapshot.systemDark
+        ? "dark"
+        : "light"
+      : theme === "nord"
+        ? "dark"
+        : theme;
 
   const setTheme = useCallback((next: Theme) => {
     localStorage.setItem(STORAGE_KEY, next);

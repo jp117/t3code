@@ -3,25 +3,30 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { type ProviderKind } from "@t3tools/contracts";
 import { getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
-import { ZapIcon } from "lucide-react";
 
 import {
-  APP_SERVICE_TIER_OPTIONS,
+  DEFAULT_TIMESTAMP_FORMAT,
   getSupportedCodexRuntimeOptions,
   getSupportedTerminalShellOptions,
   MAX_CUSTOM_MODEL_LENGTH,
-  shouldShowFastTierIcon,
   useAppSettings,
 } from "../appSettings";
+import { APP_VERSION } from "../branding";
 import { clampCompletionSoundVolumePercent } from "../completionSound";
+import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { isElectron } from "../env";
 import { type Theme, useTheme } from "../hooks/useTheme";
 import { serverConfigQueryOptions } from "../lib/serverReactQuery";
 import { ensureNativeApi } from "../nativeApi";
-import { preferredTerminalEditor } from "../terminal-links";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../components/ui/select";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { SidebarInset } from "~/components/ui/sidebar";
 
@@ -67,6 +72,12 @@ const MODEL_PROVIDER_SETTINGS: Array<{
     example: "gpt-6.7-codex-ultra-preview",
   },
 ] as const;
+
+const TIMESTAMP_FORMAT_LABELS = {
+  locale: "System default",
+  "12-hour": "12-hour",
+  "24-hour": "24-hour",
+} as const;
 
 function getCustomModelsForProvider(
   settings: ReturnType<typeof useAppSettings>["settings"],
@@ -130,16 +141,22 @@ function SettingsRouteView() {
   const codexHomePath = settings.codexHomePath;
   const codexRuntime = settings.codexRuntime;
   const codexWslDistro = settings.codexWslDistro;
-  const codexServiceTier = settings.codexServiceTier;
   const keybindingsConfigPath = serverConfigQuery.data?.keybindingsConfigPath ?? null;
+  const availableEditors = serverConfigQuery.data?.availableEditors;
 
   const openKeybindingsFile = useCallback(() => {
     if (!keybindingsConfigPath) return;
     setOpenKeybindingsError(null);
     setIsOpeningKeybindings(true);
     const api = ensureNativeApi();
+    const editor = resolveAndPersistPreferredEditor(availableEditors ?? []);
+    if (!editor) {
+      setOpenKeybindingsError("No available editors found.");
+      setIsOpeningKeybindings(false);
+      return;
+    }
     void api.shell
-      .openInEditor(keybindingsConfigPath, preferredTerminalEditor())
+      .openInEditor(keybindingsConfigPath, editor)
       .catch((error) => {
         setOpenKeybindingsError(
           error instanceof Error ? error.message : "Unable to open keybindings file.",
@@ -148,56 +165,64 @@ function SettingsRouteView() {
       .finally(() => {
         setIsOpeningKeybindings(false);
       });
-  }, [keybindingsConfigPath]);
+  }, [availableEditors, keybindingsConfigPath]);
 
-  const addCustomModel = useCallback((provider: ProviderKind) => {
-    const customModelInput = customModelInputByProvider[provider];
-    const customModels = getCustomModelsForProvider(settings, provider);
-    const normalized = normalizeModelSlug(customModelInput, provider);
-    if (!normalized) {
-      setCustomModelErrorByProvider((existing) => ({
-        ...existing,
-        [provider]: "Enter a model slug.",
-      }));
-      return;
-    }
-    if (getModelOptions(provider).some((option) => option.slug === normalized)) {
-      setCustomModelErrorByProvider((existing) => ({
-        ...existing,
-        [provider]: "That model is already built in.",
-      }));
-      return;
-    }
-    if (normalized.length > MAX_CUSTOM_MODEL_LENGTH) {
-      setCustomModelErrorByProvider((existing) => ({
-        ...existing,
-        [provider]: `Model slugs must be ${MAX_CUSTOM_MODEL_LENGTH} characters or less.`,
-      }));
-      return;
-    }
-    if (customModels.includes(normalized)) {
-      setCustomModelErrorByProvider((existing) => ({
-        ...existing,
-        [provider]: "That custom model is already saved.",
-      }));
-      return;
-    }
+  const addCustomModel = useCallback(
+    (provider: ProviderKind) => {
+      const customModelInput = customModelInputByProvider[provider];
+      const customModels = getCustomModelsForProvider(settings, provider);
+      const normalized = normalizeModelSlug(customModelInput, provider);
+      if (!normalized) {
+        setCustomModelErrorByProvider((existing) => ({
+          ...existing,
+          [provider]: "Enter a model slug.",
+        }));
+        return;
+      }
+      if (getModelOptions(provider).some((option) => option.slug === normalized)) {
+        setCustomModelErrorByProvider((existing) => ({
+          ...existing,
+          [provider]: "That model is already built in.",
+        }));
+        return;
+      }
+      if (normalized.length > MAX_CUSTOM_MODEL_LENGTH) {
+        setCustomModelErrorByProvider((existing) => ({
+          ...existing,
+          [provider]: `Model slugs must be ${MAX_CUSTOM_MODEL_LENGTH} characters or less.`,
+        }));
+        return;
+      }
+      if (customModels.includes(normalized)) {
+        setCustomModelErrorByProvider((existing) => ({
+          ...existing,
+          [provider]: "That custom model is already saved.",
+        }));
+        return;
+      }
 
-    updateSettings(patchCustomModels(provider, [...customModels, normalized]));
-    setCustomModelInputByProvider((existing) => ({
-      ...existing,
-      [provider]: "",
-    }));
-    setCustomModelErrorByProvider((existing) => ({
-      ...existing,
-      [provider]: null,
-    }));
-  }, [customModelInputByProvider, settings, updateSettings]);
+      updateSettings(patchCustomModels(provider, [...customModels, normalized]));
+      setCustomModelInputByProvider((existing) => ({
+        ...existing,
+        [provider]: "",
+      }));
+      setCustomModelErrorByProvider((existing) => ({
+        ...existing,
+        [provider]: null,
+      }));
+    },
+    [customModelInputByProvider, settings, updateSettings],
+  );
 
   const removeCustomModel = useCallback(
     (provider: ProviderKind, slug: string) => {
       const customModels = getCustomModelsForProvider(settings, provider);
-      updateSettings(patchCustomModels(provider, customModels.filter((model) => model !== slug)));
+      updateSettings(
+        patchCustomModels(
+          provider,
+          customModels.filter((model) => model !== slug),
+        ),
+      );
       setCustomModelErrorByProvider((existing) => ({
         ...existing,
         [provider]: null,
@@ -265,10 +290,55 @@ function SettingsRouteView() {
               </div>
 
               <p className="mt-4 text-xs text-muted-foreground">
-                Selected theme: <span className="font-medium text-foreground">{selectedThemeLabel}</span>
+                Selected theme:{" "}
+                <span className="font-medium text-foreground">{selectedThemeLabel}</span>
                 {" · "}
                 Color mode: <span className="font-medium text-foreground">{resolvedTheme}</span>
               </p>
+
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Timestamp format</p>
+                  <p className="text-xs text-muted-foreground">
+                    System default follows your browser or OS time format. <code>12-hour</code> and{" "}
+                    <code>24-hour</code> force the hour cycle.
+                  </p>
+                </div>
+                <Select
+                  value={settings.timestampFormat}
+                  onValueChange={(value) => {
+                    if (value !== "locale" && value !== "12-hour" && value !== "24-hour") return;
+                    updateSettings({
+                      timestampFormat: value,
+                    });
+                  }}
+                >
+                  <SelectTrigger className="w-40" aria-label="Timestamp format">
+                    <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end">
+                    <SelectItem value="locale">{TIMESTAMP_FORMAT_LABELS.locale}</SelectItem>
+                    <SelectItem value="12-hour">{TIMESTAMP_FORMAT_LABELS["12-hour"]}</SelectItem>
+                    <SelectItem value="24-hour">{TIMESTAMP_FORMAT_LABELS["24-hour"]}</SelectItem>
+                  </SelectPopup>
+                </Select>
+              </div>
+
+              {settings.timestampFormat !== defaults.timestampFormat ? (
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() =>
+                      updateSettings({
+                        timestampFormat: defaults.timestampFormat ?? DEFAULT_TIMESTAMP_FORMAT,
+                      })
+                    }
+                  >
+                    Restore default
+                  </Button>
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5">
@@ -281,7 +351,9 @@ function SettingsRouteView() {
 
               <div className="space-y-3">
                 <label className="block space-y-1">
-                  <span className="text-xs font-medium text-foreground">Default terminal shell</span>
+                  <span className="text-xs font-medium text-foreground">
+                    Default terminal shell
+                  </span>
                   <Select
                     items={terminalShellOptions.map((option) => ({
                       label: option.label,
@@ -314,7 +386,9 @@ function SettingsRouteView() {
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <p>
                     Selected shell:{" "}
-                    <span className="font-medium text-foreground">{selectedTerminalShellLabel}</span>
+                    <span className="font-medium text-foreground">
+                      {selectedTerminalShellLabel}
+                    </span>
                   </p>
                   {settings.terminalShellProfile !== defaults.terminalShellProfile ? (
                     <Button
@@ -398,7 +472,8 @@ function SettingsRouteView() {
                     spellCheck={false}
                   />
                   <span className="text-xs text-muted-foreground">
-                    Leave blank to use <code>codex</code> from your {codexRuntime === "wsl" ? "WSL PATH" : "PATH"}.
+                    Leave blank to use <code>codex</code> from your{" "}
+                    {codexRuntime === "wsl" ? "WSL PATH" : "PATH"}.
                   </span>
                 </label>
 
@@ -421,11 +496,15 @@ function SettingsRouteView() {
                   <div className="space-y-1">
                     <p>
                       Runtime:{" "}
-                      <span className="font-medium text-foreground">{selectedCodexRuntimeLabel}</span>
+                      <span className="font-medium text-foreground">
+                        {selectedCodexRuntimeLabel}
+                      </span>
                     </p>
                     <p>
                       Binary source:{" "}
-                      <span className="font-medium text-foreground">{codexBinaryPath || "PATH"}</span>
+                      <span className="font-medium text-foreground">
+                        {codexBinaryPath || "PATH"}
+                      </span>
                     </p>
                   </div>
                   <Button
@@ -456,43 +535,6 @@ function SettingsRouteView() {
               </div>
 
               <div className="space-y-5">
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-foreground">Default service tier</span>
-                  <Select
-                    items={APP_SERVICE_TIER_OPTIONS.map((option) => ({
-                      label: option.label,
-                      value: option.value,
-                    }))}
-                    value={codexServiceTier}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      updateSettings({ codexServiceTier: value });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectPopup alignItemWithTrigger={false}>
-                      {APP_SERVICE_TIER_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex min-w-0 items-center gap-2">
-                            {option.value === "fast" ? (
-                              <ZapIcon className="size-3.5 text-amber-500" />
-                            ) : (
-                              <span className="size-3.5 shrink-0" aria-hidden="true" />
-                            )}
-                            <span className="truncate">{option.label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectPopup>
-                  </Select>
-                  <span className="text-xs text-muted-foreground">
-                    {APP_SERVICE_TIER_OPTIONS.find((option) => option.value === codexServiceTier)
-                      ?.description ?? "Use Codex defaults without forcing a service tier."}
-                  </span>
-                </label>
-
                 {MODEL_PROVIDER_SETTINGS.map((providerSettings) => {
                   const provider = providerSettings.provider;
                   const customModels = getCustomModelsForProvider(settings, provider);
@@ -572,10 +614,9 @@ function SettingsRouteView() {
                                 variant="outline"
                                 onClick={() =>
                                   updateSettings(
-                                    patchCustomModels(
-                                      provider,
-                                      [...getDefaultCustomModelsForProvider(defaults, provider)],
-                                    ),
+                                    patchCustomModels(provider, [
+                                      ...getDefaultCustomModelsForProvider(defaults, provider),
+                                    ]),
                                   )
                                 }
                               >
@@ -591,14 +632,9 @@ function SettingsRouteView() {
                                   key={`${provider}:${slug}`}
                                   className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
                                 >
-                                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                                    {provider === "codex" && shouldShowFastTierIcon(slug, codexServiceTier) ? (
-                                      <ZapIcon className="size-3.5 shrink-0 text-amber-500" />
-                                    ) : null}
-                                    <code className="min-w-0 flex-1 truncate text-xs text-foreground">
-                                      {slug}
-                                    </code>
-                                  </div>
+                                  <code className="min-w-0 flex-1 truncate text-xs text-foreground">
+                                    {slug}
+                                  </code>
                                   <Button
                                     size="xs"
                                     variant="ghost"
@@ -695,7 +731,9 @@ function SettingsRouteView() {
 
                 <label className="block space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-foreground">Completion sound volume</span>
+                    <span className="text-xs font-medium text-foreground">
+                      Completion sound volume
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {settings.completionSoundVolume}%
                     </span>
@@ -740,6 +778,49 @@ function SettingsRouteView() {
                   </Button>
                 </div>
               )}
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">Threads</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose the default workspace mode for newly created draft threads.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Default to New worktree</p>
+                  <p className="text-xs text-muted-foreground">
+                    New threads start in New worktree mode instead of Local.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.defaultThreadEnvMode === "worktree"}
+                  onCheckedChange={(checked) =>
+                    updateSettings({
+                      defaultThreadEnvMode: checked ? "worktree" : "local",
+                    })
+                  }
+                  aria-label="Default new threads to New worktree mode"
+                />
+              </div>
+
+              {settings.defaultThreadEnvMode !== defaults.defaultThreadEnvMode ? (
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() =>
+                      updateSettings({
+                        defaultThreadEnvMode: defaults.defaultThreadEnvMode,
+                      })
+                    }
+                  >
+                    Restore default
+                  </Button>
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5">
@@ -819,6 +900,25 @@ function SettingsRouteView() {
                   </Button>
                 </div>
               ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">About</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Application version and environment information.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Version</p>
+                  <p className="text-xs text-muted-foreground">
+                    Current version of the application.
+                  </p>
+                </div>
+                <code className="text-xs font-medium text-muted-foreground">{APP_VERSION}</code>
+              </div>
             </section>
           </div>
         </div>
